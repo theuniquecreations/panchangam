@@ -226,6 +226,13 @@ export async function saveUser(profile: Partial<UserProfile>): Promise<UserProfi
   return payload;
 }
 
+/** Removes a profile row. Irreversible — callers must confirm first. */
+export async function deleteUser(id: string): Promise<void> {
+  if (!BACKEND_READY) throw new BackendNotReadyError();
+  if (!id) throw new Error("A row id is required to delete.");
+  await request(`/removeitem/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 /* ------------------------------------------------------------------ *
  * Auth — the OTP is issued and verified server-side, which is also what
  * produces the bearer token the item service requires.

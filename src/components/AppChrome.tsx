@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Sun, User, LogIn, LogOut } from "lucide-react";
-import { BRAND_TITLE, BRAND_TAGLINE } from "@/lib/config";
+import { Sun, User, LogIn, LogOut, ShieldCheck } from "lucide-react";
+import { BRAND_TITLE, BRAND_TAGLINE, isAdminEmail } from "@/lib/config";
 import { useSession, useSessionReady, clearSession } from "@/lib/session";
 import { clearCachedProfile } from "@/lib/profile-cache";
 
@@ -48,9 +48,16 @@ export function AppBar() {
 // Bottom tab bar — the primary navigation once this runs inside the RN WebView.
 export function TabBar() {
   const pathname = usePathname();
+  const session = useSession();
+
   const tabs = [
     { href: "/", label: "Panchangam", Icon: Sun },
     { href: "/profile", label: "Profile", Icon: User },
+    // Only surfaced for the configured admin accounts. The page re-checks on
+    // load, so hiding the tab is convenience, not the gate.
+    ...(isAdminEmail(session?.email)
+      ? [{ href: "/admin", label: "Admin", Icon: ShieldCheck }]
+      : []),
   ];
 
   return (

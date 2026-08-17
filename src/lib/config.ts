@@ -56,6 +56,21 @@ export const PROFILE_CACHE_KEY = "panchangam_profile_cache";
  * Auth
  * ------------------------------------------------------------------ */
 
+// Accounts that may open /admin. Checked against the signed-in session email.
+//
+// NOTE: this is a UI-level gate only — it decides what the app shows, not what
+// the backend permits. Any signed-in user's token can still call the item
+// service directly. Real enforcement needs the role claim in the JWT checked
+// server-side; the token already carries one.
+export const ADMIN_EMAILS = [
+  "vbalakumar.cse@gmail.com",
+  "aroun.kesavaraj@gmail.com",
+  "support@templehub.org",
+];
+
+export const isAdminEmail = (email?: string | null): boolean =>
+  !!email && ADMIN_EMAILS.includes(email.trim().toLowerCase());
+
 export const OTP_LENGTH = 6;
 export const OTP_TTL_MS = 10 * 60 * 1000; // OTP valid for 10 minutes
 export const OTP_RESEND_COOLDOWN_S = 30;
