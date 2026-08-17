@@ -10,10 +10,18 @@ import {
   ORG_CODE,
   ITEM_TYPE_USER,
   BACKEND_READY,
+  requireConfig,
 } from "./config";
 import { getSession, clearSession } from "./session";
 
-const BASE = `${SERVICE_URL.replace(/\/$/, "")}/${ORG_CODE}`;
+/** Built per call rather than at module load: these come from the environment
+ * with no fallback, and a missing one should surface as a clear error where the
+ * request is made, not crash the module on import. */
+const baseUrl = () =>
+  `${requireConfig("SERVICE_URL", SERVICE_URL).replace(/\/$/, "")}/${requireConfig(
+    "ORG_CODE",
+    ORG_CODE,
+  )}`;
 
 /** Thrown when the backend org is not provisioned yet, so callers can show a
  * useful message instead of surfacing a raw 400. */
@@ -53,7 +61,7 @@ async function request(path: string, options: RequestInit = {}) {
   }
   headers.set("Authorization", `Bearer ${session.token}`);
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${baseUrl()}${path}`, {
     ...options,
     headers,
     cache: "no-store",

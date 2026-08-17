@@ -9,7 +9,7 @@
 // an open relay would let anyone send mail from our domain. The sender is
 // pinned server-side and the rest is validated and length-capped.
 
-import { SEND_EMAIL_URL, FROM_EMAIL } from "@/lib/config";
+import { sendEmailServer } from "@/lib/server/email";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20_000;
@@ -37,34 +37,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Subject and body are required" }, { status: 400 });
   }
 
-  const base = SEND_EMAIL_URL.endsWith("/") ? SEND_EMAIL_URL : `${SEND_EMAIL_URL}/`;
-
   try {
-    const upstream = await fetch(`${base}sendemail`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // `cc` and `attachments` are omitted rather than sent empty: SES treats
-      // an empty cc as an address and fails the whole send with
-      // "InvalidParameterValue … Invalid email address .".
-      body: JSON.stringify({
-        // Pinned here, never taken from the client.
-        sender: FROM_EMAIL,
-        recipient,
-        subject,
-        body,
-      }),
-    });
-
-    const text = await upstream.text();
-
-    if (!upstream.ok) {
-      console.error("Email service rejected the request:", upstream.status, text);
-      return Response.json(
-        { error: `Email service returned ${upstream.status}`, detail: text.slice(0, 300) },
-        { status: 502 },
-      );
-    }
-
+    // Shared with the OTP route: it pins the sender, omits the empty cc that
+    // SES rejects, and reports a missing SEND_EMAIL_URL clearly.
+    await sendEmailServer(recipient, subject, body);
     return Response.json({ ok: true });
   } catch (err) {
     console.error("Could not reach the email service:", err);

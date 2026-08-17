@@ -5,14 +5,17 @@
 // is blocked by CORS. Everything goes through a route handler instead.
 
 import "server-only";
-import { SEND_EMAIL_URL, FROM_EMAIL } from "@/lib/config";
+import { SEND_EMAIL_URL, FROM_EMAIL, requireConfig } from "@/lib/config";
 
 export async function sendEmailServer(
   recipient: string,
   subject: string,
   body: string,
 ): Promise<void> {
-  const base = SEND_EMAIL_URL.endsWith("/") ? SEND_EMAIL_URL : `${SEND_EMAIL_URL}/`;
+  // No fallback URL, so an unset variable must report itself rather than
+  // posting to "undefined/sendemail".
+  const url = requireConfig("SEND_EMAIL_URL", SEND_EMAIL_URL);
+  const base = url.endsWith("/") ? url : `${url}/`;
 
   const res = await fetch(`${base}sendemail`, {
     method: "POST",

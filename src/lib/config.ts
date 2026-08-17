@@ -5,9 +5,14 @@
 /* ------------------------------------------------------------------ *
  * Backend services
  *
- * Read from the environment, falling back to the values below so a fresh
- * checkout runs without a .env file. Set them in .env.local locally and in the
- * Amplify environment variables per branch.
+ * Read from the environment with NO fallbacks — an unset variable resolves to
+ * "" rather than a hardcoded endpoint, so no infrastructure address lives in
+ * the repository and a misconfigured deploy cannot quietly talk to the wrong
+ * backend. `requireConfig` below turns a missing value into a clear error at
+ * the point of use instead of a malformed URL.
+ *
+ * Set them in .env.local locally and in the Amplify environment variables per
+ * branch; see .env.example.
  *
  * SERVICE_URL, SEND_EMAIL_URL and ORG_CODE are mapped to the browser in
  * next.config.ts — Next only exposes NEXT_PUBLIC_* automatically, and client
@@ -16,33 +21,35 @@
  * read directly inside the OTP route handler instead.
  * ------------------------------------------------------------------ */
 
-/** Trims, strips stray quotes and drops empty values, so `KEY = "value"` in a
- * .env file resolves the same as `KEY=value`. */
-const fromEnv = (value: string | undefined, fallback: string): string => {
-  const cleaned = (value ?? "").trim().replace(/^["']|["']$/g, "");
-  return cleaned || fallback;
-};
+/** Trims and strips stray quotes, so `KEY = "value"` in a .env file resolves
+ * the same as `KEY=value`. Returns "" when unset. */
+const fromEnv = (value: string | undefined): string =>
+  (value ?? "").trim().replace(/^["']|["']$/g, "");
 
 // Generic item service. Routes are {SERVICE_URL}/{ORG_CODE}/<route>, e.g.
 //   GET  {SERVICE_URL}/{ORG_CODE}/itemsbytype/user-panchangam
 //   POST {SERVICE_URL}/{ORG_CODE}/items
-export const SERVICE_URL = fromEnv(
-  process.env.SERVICE_URL,
-  "https://z7z4g52p2g.execute-api.ap-south-1.amazonaws.com",
-);
+export const SERVICE_URL = fromEnv(process.env.SERVICE_URL);
 
 // OTP / transactional email service.
-export const SEND_EMAIL_URL = fromEnv(
-  process.env.SEND_EMAIL_URL,
-  "https://yzcjrbt1x1.execute-api.us-east-1.amazonaws.com/",
-);
+export const SEND_EMAIL_URL = fromEnv(process.env.SEND_EMAIL_URL);
 
-// Borrowed from the temple app for now: "sbht" is an active organisation, while
-// "panchangam" answers `400 No active organisation found`. Panchangam rows are
-// still isolated because every payload is stamped `type: user-panchangam`, so
-// itemsbytype never mixes them with temple data.
-// TODO(backend): switch to a dedicated "panchangam" org once it is provisioned.
-export const ORG_CODE = fromEnv(process.env.ORG_CODE, "sbht");
+// Which organisation the item rows belong to. Panchangam rows stay separable
+// whatever this is set to, because every payload is stamped
+// `type: user-panchangam`, so itemsbytype never mixes them with other data.
+export const ORG_CODE = fromEnv(process.env.ORG_CODE);
+
+/** Throws a named, actionable error when a required variable is missing, so a
+ * misconfigured environment reports itself instead of producing requests to
+ * URLs like "/sbht/items" or "undefined/sendemail". */
+export function requireConfig(name: string, value: string): string {
+  if (!value) {
+    throw new Error(
+      `${name} is not set. Add it to .env.local (see .env.example), or to the Amplify environment variables for this branch.`,
+    );
+  }
+  return value;
+}
 
 // Guards profile calls so the UI can explain itself rather than surfacing raw
 // backend errors. Set false if the org above stops resolving.
