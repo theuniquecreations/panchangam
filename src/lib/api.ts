@@ -111,6 +111,10 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
 export type UserProfile = {
   id?: string;
   type: typeof ITEM_TYPE_USER;
+  /** Required in the body on writes — see saveUser. */
+  orgCode?: string;
+  /** The backend expects a date on every row; it defaults to today on save. */
+  date?: string;
   email: string;
   name?: string;
   gender?: string;
@@ -206,7 +210,14 @@ function pickProfile(rows: UserProfile[]): UserProfile {
  * The write is queued: the backend answers 200 with an SQS SendMessageResponse
  * and persists afterwards. So a 200 means "accepted", not "stored", and an
  * immediate read-back may not see the row yet. The saved object is returned
- * from here rather than re-fetched, so the UI stays correct regardless. */
+ * from here rather than re-fetched, so the UI stays correct regardless.
+ *
+ * `orgCode` MUST be in the body. The org in the URL path is not enough — the
+ * queue consumer drops rows without it, and because SQS has already ack'd the
+ * message the call still returns 200. Verified: an otherwise identical payload
+ * without orgCode returns 200 and never appears; with it, the row persists.
+ * `date` is likewise expected on every row, defaulted here as the temple app
+ * does. */
 export async function saveUser(profile: Partial<UserProfile>): Promise<UserProfile> {
   if (!BACKEND_READY) throw new BackendNotReadyError();
   const now = new Date().toISOString();
@@ -215,6 +226,8 @@ export async function saveUser(profile: Partial<UserProfile>): Promise<UserProfi
     ...profile,
     id: profile.id || newUserId(),
     type: ITEM_TYPE_USER,
+    orgCode: ORG_CODE,
+    date: profile.date || new Date().toLocaleDateString("en-CA"),
     email: (profile.email || "").trim().toLowerCase(),
     createdAt: profile.createdAt || now,
     updatedAt: now,
