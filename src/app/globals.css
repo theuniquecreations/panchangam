@@ -1,26 +1,681 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ *
+ * Theme — deep maroon (#541001) and gold (#FFD86D).
+ * ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --maroon: #541001;
+  --maroon-deep: #3a0b01;
+  --maroon-light: #7a1c06;
+  --gold: #ffd86d;
+  --gold-soft: #ffe9a8;
+  --gold-dim: rgba(255, 216, 109, 0.55);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --cream: #fffaf2;
+  --page-bg: #fdf6ec;
+  --surface: #ffffff;
+  --text: #2b1508;
+  --text-mid: #6b5544;
+  --border-warm: rgba(84, 16, 1, 0.14);
+
+  --auspicious: #1f7a4d;
+  --inauspicious: #b3341c;
+
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  /* Safe-area insets so the app sits correctly inside an RN WebView on
+     notched devices. Falls back to 0 in a normal browser. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --page-bg: #1a0a03;
+    --surface: #2a1006;
+    --text: #fdf6ec;
+    --text-mid: #c9ab8f;
+    --border-warm: rgba(255, 216, 109, 0.18);
   }
 }
 
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Prevent iOS from auto-inflating text in the WebView. */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+/* Mobile-first shell: a single centred column that stays comfortable on a
+   phone and simply gains margin on larger screens. */
+.app-shell {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 88px);
+  box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------------ *
+ * App bar
+ * ------------------------------------------------------------------ */
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(var(--safe-top) + 12px) 16px 12px;
+  background: var(--maroon);
+  color: var(--gold);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+
+.app-bar-brand {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-bar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: var(--gold);
+}
+
+.app-bar-tagline {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 216, 109, 0.7);
+}
+
+.app-bar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gold-dim);
+  background: rgba(255, 216, 109, 0.1);
+  color: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.app-bar-action:active {
+  background: rgba(255, 216, 109, 0.22);
+}
+
+/* ------------------------------------------------------------------ *
+ * Calendar filter — pick any date, the tile below follows
+ * ------------------------------------------------------------------ */
+.date-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.date-bar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-warm);
+  background: var(--surface);
+  color: var(--maroon);
+  cursor: pointer;
+}
+
+.date-bar-nav:disabled {
+  opacity: 0.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .date-bar-nav {
+    color: var(--gold);
+  }
+}
+
+.date-bar-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-warm);
+  background: var(--surface);
+  /* The whole field is the picker target. */
+  cursor: pointer;
+}
+
+.date-bar-icon {
+  flex-shrink: 0;
+  color: var(--maroon);
+}
+
+@media (prefers-color-scheme: dark) {
+  .date-bar-icon {
+    color: var(--gold);
+  }
+}
+
+.date-bar-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  /* 16px keeps iOS Safari from zooming when the picker opens. */
+  font-size: 16px;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 12px 0;
+  /* Editing happens through the calendar only, so suppress the text caret. */
+  caret-color: transparent;
+  cursor: pointer;
+}
+
+.date-bar-input:focus {
+  outline: none;
+}
+
+/* The native indicator is near-invisible on a dark surface; tint it to match. */
+.date-bar-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+@media (prefers-color-scheme: dark) {
+  .date-bar-input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}
+
+.date-bar-today {
+  display: block;
+  margin: -4px 0 12px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-warm);
+  background: var(--gold);
+  color: var(--maroon-deep);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ------------------------------------------------------------------ *
+ * Panchangam tile
+ * ------------------------------------------------------------------ */
+.info-tile {
+  background: linear-gradient(180deg, var(--maroon-light), var(--maroon-deep));
+  color: var(--cream);
+  border: 1px solid rgba(255, 216, 109, 0.22);
+  box-shadow: 0 8px 24px rgba(58, 11, 1, 0.28);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.info-tile-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 216, 109, 0.18);
+  padding-bottom: 12px;
+}
+
+.info-tile-title-row > .info-tile-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.info-tile-icon {
+  flex-shrink: 0;
+  color: var(--gold);
+}
+
+.info-tile-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+.info-tile-subtitle {
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+  opacity: 0.75;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+}
+
+.info-tile-nav {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.info-tile-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 216, 109, 0.3);
+  background: rgba(255, 216, 109, 0.08);
+  color: var(--gold);
+  cursor: pointer;
+}
+
+.info-tile-nav-btn:active {
+  background: rgba(255, 216, 109, 0.2);
+}
+
+.events-fallback {
+  text-align: center;
+  padding: 32px 0;
+  color: rgba(255, 250, 242, 0.6);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+
+/* Header strip: location + live clock */
+.panchangam-header {
+  font-size: 0.72rem;
+  color: rgba(255, 250, 242, 0.68);
+  margin-bottom: 12px;
+  line-height: 1.4;
+  border-bottom: 1px dashed rgba(255, 216, 109, 0.18);
+  padding-bottom: 10px;
+}
+
+.panchangam-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panchangam-header-row > span:first-child {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.panchangam-loc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 216, 109, 0.3);
+  background: rgba(255, 216, 109, 0.06);
+  color: rgba(255, 250, 242, 0.88);
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panchangam-loc-toggle.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--maroon-deep);
+}
+
+.panchangam-loc-toggle:disabled {
+  opacity: 0.6;
+}
+
+.panchangam-loc-error {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.66rem;
+  color: #ffb4a0;
+}
+
+/* Two-column field grid — the core of the tile */
+.panchangam-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.panchangam-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.panchangam-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  opacity: 0.85;
+  font-weight: 700;
+}
+
+.panchangam-value {
+  font-size: 0.86rem;
+  line-height: 1.3;
+  color: var(--cream);
+  word-break: break-word;
+}
+
+.panchangam-value-split {
+  display: flex;
+  flex-direction: column;
+}
+
+.panchangam-value-split > span:last-child {
+  font-size: 0.72rem;
+  opacity: 0.72;
+}
+
+/* Expandable almanac section */
+.panchangam-almanac-section {
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 216, 109, 0.18);
+  padding-top: 12px;
+}
+
+.almanac-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.almanac-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(255, 216, 109, 0.12);
+  font-size: 0.8rem;
+}
+
+.almanac-row:last-child {
+  border-bottom: none;
+}
+
+.almanac-label {
+  color: rgba(255, 250, 242, 0.72);
+  flex-shrink: 0;
+}
+
+.almanac-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+
+.almanac-value.auspicious {
+  color: #8ce0b0;
+}
+
+.almanac-value.inauspicious {
+  color: #ffb4a0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Cards, forms, buttons
+ * ------------------------------------------------------------------ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  box-shadow: 0 2px 10px rgba(84, 16, 1, 0.06);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin: 0 0 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-title {
+    color: var(--gold);
+  }
+}
+
+.card-note {
+  font-size: 0.78rem;
+  color: var(--text-mid);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-mid);
+}
+
+.field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 13px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-warm);
+  background: var(--page-bg);
+  color: var(--text);
+  /* 16px minimum stops iOS Safari zooming the viewport on focus. */
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--maroon);
+  box-shadow: 0 0 0 3px rgba(255, 216, 109, 0.35);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  /* 48px tall — comfortable touch target on a phone. */
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--maroon);
+  color: var(--gold);
+}
+
+.btn-primary:active {
+  background: var(--maroon-deep);
+}
+
+.btn-secondary {
+  background: var(--gold);
+  color: var(--maroon-deep);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--maroon);
+  border-color: var(--border-warm);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-ghost {
+    color: var(--gold);
+  }
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.alert {
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
+.alert-error {
+  background: rgba(179, 52, 28, 0.1);
+  border: 1px solid rgba(179, 52, 28, 0.3);
+  color: var(--inauspicious);
+}
+
+.alert-success {
+  background: rgba(31, 122, 77, 0.1);
+  border: 1px solid rgba(31, 122, 77, 0.3);
+  color: var(--auspicious);
+}
+
+.alert-info {
+  background: rgba(255, 216, 109, 0.16);
+  border: 1px solid rgba(255, 216, 109, 0.4);
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ *
+ * Trial / subscription banner
+ * ------------------------------------------------------------------ */
+.trial-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+  color: var(--maroon-deep);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Bottom tab bar — the primary navigation on mobile
+ * ------------------------------------------------------------------ */
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border-warm);
+  padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -2px 14px rgba(84, 16, 1, 0.08);
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px 7px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-decoration: none;
+}
+
+.tab-item.active {
+  color: var(--maroon);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-item.active {
+    color: var(--gold);
+  }
+}
+
+.section-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+  margin: 22px 0 10px;
 }
