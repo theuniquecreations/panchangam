@@ -11,7 +11,7 @@ import {
   ITEM_TYPE_USER,
   BACKEND_READY,
 } from "./config";
-import { getSession } from "./session";
+import { getSession, clearSession } from "./session";
 
 const BASE = `${SERVICE_URL.replace(/\/$/, "")}/${ORG_CODE}`;
 
@@ -24,6 +24,17 @@ export class BackendNotReadyError extends Error {
   }
 }
 
+/** Thrown when the session carries no usable token — either it expired, or it
+ * predates the server-side login that issues one. Without this the backend
+ * answers a bare `401 {"message":"Unauthorized"}`, which reads like a bug
+ * rather than "sign in again". */
+export class SessionExpiredError extends Error {
+  constructor() {
+    super("Your session has expired. Please sign in again.");
+    this.name = "SessionExpiredError";
+  }
+}
+
 /** Attaches the bearer token from the current session, when there is one.
  * Reads are public where the backend allows it; writes need a logged-in user. */
 async function request(path: string, options: RequestInit = {}) {
@@ -33,13 +44,27 @@ async function request(path: string, options: RequestInit = {}) {
   }
 
   const session = getSession();
-  if (session?.token) headers.set("Authorization", `Bearer ${session.token}`);
+  // Fail fast rather than making a call that can only 401. A session with no
+  // token is one issued before login moved server-side, or a restored mirror
+  // of one.
+  if (!session?.token) {
+    clearSession();
+    throw new SessionExpiredError();
+  }
+  headers.set("Authorization", `Bearer ${session.token}`);
 
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers,
     cache: "no-store",
   });
+
+  // A rejected token is not worth retrying, and leaving it in place would make
+  // every later call fail the same way.
+  if (res.status === 401 || res.status === 403) {
+    clearSession();
+    throw new SessionExpiredError();
+  }
 
   if (!res.ok) {
     // Surface the server's own message — it is far more useful than the status
@@ -50,7 +75,18 @@ async function request(path: string, options: RequestInit = {}) {
     );
   }
 
-  return res.status === 204 ? null : res.json();
+  if (res.status === 204) return null;
+
+  // Not every successful route answers with JSON. Writes are queued onto SQS
+  // and come back as an XML <SendMessageResponse>, so blindly calling
+  // res.json() threw `Unexpected token '<', "<?xml vers"...` on every save.
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("json")) {
+    const text = await res.text().catch(() => "");
+    return text || null;
+  }
+
+  return res.json();
 }
 
 /** Retries transient failures. Auth errors are never retried — they will not
@@ -165,7 +201,12 @@ function pickProfile(rows: UserProfile[]): UserProfile {
   )[0];
 }
 
-/** Create or update a profile. Every payload is stamped with the item type. */
+/** Create or update a profile. Every payload is stamped with the item type.
+ *
+ * The write is queued: the backend answers 200 with an SQS SendMessageResponse
+ * and persists afterwards. So a 200 means "accepted", not "stored", and an
+ * immediate read-back may not see the row yet. The saved object is returned
+ * from here rather than re-fetched, so the UI stays correct regardless. */
 export async function saveUser(profile: Partial<UserProfile>): Promise<UserProfile> {
   if (!BACKEND_READY) throw new BackendNotReadyError();
   const now = new Date().toISOString();

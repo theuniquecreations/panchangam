@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTHS = [
@@ -59,12 +64,20 @@ export default function Calendar({
   value,
   today,
   onChange,
+  placeholder = "Select a date",
+  /** Stepping month by month to a birth year is unusable, so the header title
+   * opens a month+year picker. */
+  yearRange = 100,
 }: {
   value: string;
   today: string;
   onChange: (next: string) => void;
+  placeholder?: string;
+  yearRange?: number;
 }) {
   const [open, setOpen] = useState(false);
+  // "days" is the normal grid; "months" is the month+year jump panel.
+  const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? fromDateValue(value) : null;
 
   // Which month the grid is showing; follows the selection when it changes.
@@ -108,8 +121,16 @@ export default function Calendar({
       setViewYear(selected.getFullYear());
       setViewMonth(selected.getMonth());
     }
+    setMode("days");
     setOpen(true);
   };
+
+  // Newest first: a birth year is far more likely to be recent-ish than 100
+  // years back, so it needs the fewest scrolls.
+  const years = useMemo(() => {
+    const end = new Date().getFullYear();
+    return Array.from({ length: yearRange + 1 }, (_, i) => end - i);
+  }, [yearRange]);
 
   const stepMonth = (delta: number) => {
     const d = new Date(viewYear, viewMonth + delta, 1);
@@ -124,7 +145,7 @@ export default function Calendar({
         month: "short",
         year: "numeric",
       })
-    : "Select a date";
+    : placeholder;
 
   return (
     <div className="cal-wrap" ref={wrapRef}>
@@ -147,22 +168,69 @@ export default function Calendar({
               className="cal-head-nav"
               onClick={() => stepMonth(-1)}
               aria-label="Previous month"
+              disabled={mode === "months"}
+              style={{ visibility: mode === "months" ? "hidden" : undefined }}
             >
               <ChevronLeft size={17} />
             </button>
-            <span className="cal-head-title">
+            <button
+              type="button"
+              className="cal-head-title"
+              onClick={() => setMode(mode === "days" ? "months" : "days")}
+              aria-label="Choose month and year"
+            >
               {MONTHS[viewMonth]} {viewYear}
-            </span>
+              <ChevronDown
+                size={14}
+                style={{
+                  transform: mode === "months" ? "rotate(180deg)" : undefined,
+                }}
+              />
+            </button>
             <button
               type="button"
               className="cal-head-nav"
               onClick={() => stepMonth(1)}
               aria-label="Next month"
+              disabled={mode === "months"}
+              style={{ visibility: mode === "months" ? "hidden" : undefined }}
             >
               <ChevronRight size={17} />
             </button>
           </div>
 
+          {mode === "months" ? (
+            <div className="cal-jump">
+              <div className="cal-months">
+                {MONTHS.map((m, i) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`cal-month${i === viewMonth ? " selected" : ""}`}
+                    onClick={() => {
+                      setViewMonth(i);
+                      setMode("days");
+                    }}
+                  >
+                    {m.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+              <div className="cal-years">
+                {years.map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    className={`cal-year${y === viewYear ? " selected" : ""}`}
+                    onClick={() => setViewYear(y)}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="cal-grid cal-weekdays">
             {WEEKDAYS.map((d, i) => (
               <span key={i} className="cal-weekday">
@@ -196,16 +264,18 @@ export default function Calendar({
             })}
           </div>
 
-          <button
-            type="button"
-            className="cal-today-btn"
-            onClick={() => {
-              onChange(today);
-              setOpen(false);
-            }}
-          >
-            Today
-          </button>
+              <button
+                type="button"
+                className="cal-today-btn"
+                onClick={() => {
+                  onChange(today);
+                  setOpen(false);
+                }}
+              >
+                Today
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -51,7 +51,17 @@ export default function LoginPage() {
    * what authorises every later item-service call. */
   const completeLogin = async (verifiedEmail: string, token?: string) => {
     const now = new Date().toISOString();
-    let session: Session = { email: verifiedEmail, loggedInAt: now, token };
+    let session: Session = {
+      email: verifiedEmail,
+      loggedInAt: now,
+      token,
+      trialStartedAt: now,
+    };
+
+    // Store the token *before* the lookup: the API client reads the session for
+    // its Authorization header, so a lookup made first would go out unauthorised
+    // and clear the session it was about to populate.
+    setSession(session);
 
     // Pull the existing profile so the trial clock and name survive re-logins.
     try {
@@ -64,19 +74,17 @@ export default function LoginPage() {
           trialStartedAt: profile.trialStartedAt || now,
           subscribedUntil: profile.subscribedUntil,
         };
-      } else {
-        session.trialStartedAt = now;
+        setSession(session);
       }
     } catch (err) {
       // A profile lookup failure must not block sign-in — the profile page
-      // will surface the real problem and let them retry there.
+      // will surface the real problem and let them retry there. A brand-new
+      // user simply has no row yet.
       if (!(err instanceof BackendNotReadyError)) {
         console.warn("Profile lookup failed during login:", err);
       }
-      session.trialStartedAt = now;
     }
 
-    setSession(session);
     router.push("/profile");
   };
 

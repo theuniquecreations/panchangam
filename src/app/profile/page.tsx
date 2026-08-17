@@ -7,6 +7,7 @@ import {
   getUserByEmail,
   saveUser,
   BackendNotReadyError,
+  SessionExpiredError,
   type UserProfile,
 } from "@/lib/api";
 import {
@@ -17,6 +18,7 @@ import {
   type Session,
 } from "@/lib/session";
 import { savePlace } from "@/lib/place";
+import Calendar, { toDateValue } from "@/components/Calendar";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
@@ -106,6 +108,12 @@ export default function ProfilePage() {
         }
       } catch (err) {
         if (cancelled) return;
+        // An expired or tokenless session cannot be recovered here — send them
+        // to sign in rather than showing an error they cannot act on.
+        if (err instanceof SessionExpiredError) {
+          router.replace("/login");
+          return;
+        }
         setError(
           err instanceof BackendNotReadyError
             ? err.message
@@ -208,6 +216,10 @@ export default function ProfilePage() {
 
       setNotice("Your details are saved.");
     } catch (err) {
+      if (err instanceof SessionExpiredError) {
+        router.replace("/login");
+        return;
+      }
       setError(
         err instanceof BackendNotReadyError
           ? err.message
@@ -241,6 +253,9 @@ export default function ProfilePage() {
   if (!session) return null;
 
   const entitlement = getEntitlement(session);
+  // Used by the calendar to mark today; a birth date is never "today" in
+  // practice, but the marker keeps the grid oriented.
+  const todayValue = toDateValue(new Date());
 
   return (
     <>
@@ -306,31 +321,30 @@ export default function ProfilePage() {
               </select>
             </div>
 
-            <div className="field-row">
-              <div className="field">
-                <label className="field-label" htmlFor="birthDate">
-                  Date of birth
-                </label>
-                <input
-                  id="birthDate"
-                  className="field-input"
-                  type="date"
-                  value={form.birthDate}
-                  onChange={(e) => set("birthDate")(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="birthTime">
-                  Time of birth
-                </label>
-                <input
-                  id="birthTime"
-                  className="field-input"
-                  type="time"
-                  value={form.birthTime}
-                  onChange={(e) => set("birthTime")(e.target.value)}
-                />
-              </div>
+            <div className="field">
+              <span className="field-label">Date of birth</span>
+              {/* Themed calendar rather than the native control, whose popup is
+                  drawn by the OS. The header title opens a month+year jump so a
+                  birth year is a couple of taps, not decades of stepping. */}
+              <Calendar
+                value={form.birthDate}
+                today={todayValue}
+                onChange={set("birthDate")}
+                placeholder="Choose your date of birth"
+              />
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="birthTime">
+                Time of birth
+              </label>
+              <input
+                id="birthTime"
+                className="field-input"
+                type="time"
+                value={form.birthTime}
+                onChange={(e) => set("birthTime")(e.target.value)}
+              />
             </div>
 
             <div className="field">

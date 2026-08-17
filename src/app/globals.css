@@ -220,10 +220,81 @@ body {
 }
 
 .cal-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: rgba(255, 216, 109, 0.08);
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--gold);
   letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.cal-head-title:active {
+  background: rgba(255, 216, 109, 0.2);
+}
+
+/* Month + year jump panel — stepping month by month to a birth year is
+   unusable, so the header title opens this. */
+.cal-months {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.cal-month {
+  padding: 9px 0;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 216, 109, 0.22);
+  background: rgba(255, 216, 109, 0.06);
+  color: var(--cream);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cal-month.selected {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--maroon-deep);
+}
+
+.cal-years {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  max-height: 168px;
+  overflow-y: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 216, 109, 0.18);
+  /* Momentum scrolling inside the popup on iOS. */
+  -webkit-overflow-scrolling: touch;
+}
+
+.cal-year {
+  padding: 8px 0;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cream);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cal-year.selected {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--maroon-deep);
+  font-weight: 700;
 }
 
 .cal-head-nav {
