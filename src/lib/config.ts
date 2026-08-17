@@ -47,6 +47,11 @@ export const BIOMETRIC_KEY = "panchangam_biometric";
 // coordinates are not sensitive, and the tile needs it on first paint.
 export const PLACE_KEY = "panchangam_place";
 
+// Last profile this device saved. Writes are queued on the backend, so a read
+// straight after a save can still return the previous row; this lets the app
+// show what the user actually saved until the queue catches up.
+export const PROFILE_CACHE_KEY = "panchangam_profile_cache";
+
 /* ------------------------------------------------------------------ *
  * Auth
  * ------------------------------------------------------------------ */

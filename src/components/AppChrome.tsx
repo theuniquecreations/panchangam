@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Sun, User, LogIn, LogOut } from "lucide-react";
 import { BRAND_TITLE, BRAND_TAGLINE } from "@/lib/config";
 import { useSession, useSessionReady, clearSession } from "@/lib/session";
+import { clearCachedProfile } from "@/lib/profile-cache";
 
 // Top bar. The session lives in browser storage, so it is read through
 // useSyncExternalStore: the server snapshot is null and the real value lands
@@ -16,6 +17,9 @@ export function AppBar() {
 
   const handleLogout = () => {
     clearSession();
+    // Drop the pending-write cache too, so the next person to sign in on this
+    // device cannot be shown the previous user's unsynced profile.
+    clearCachedProfile();
     router.push("/");
   };
 

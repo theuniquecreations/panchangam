@@ -18,6 +18,7 @@ import {
   type Session,
 } from "@/lib/session";
 import { savePlace } from "@/lib/place";
+import { cacheProfile, withPendingWrite } from "@/lib/profile-cache";
 import Calendar, { toDateValue } from "@/components/Calendar";
 import {
   isBiometricAvailable,
@@ -89,8 +90,11 @@ export default function ProfilePage() {
       setBioOn(isBiometricEnabled());
 
       try {
-        const profile = await getUserByEmail(session.email);
+        const fetched = await getUserByEmail(session.email);
         if (cancelled) return;
+        // Prefer a newer local save the backend queue has not applied yet, so
+        // returning to this page never shows a name the user already replaced.
+        const profile = withPendingWrite(fetched, session.email);
         if (profile) {
           setExisting(profile);
           setForm({
@@ -192,6 +196,9 @@ export default function ProfilePage() {
       });
 
       setExisting(saved);
+      // The write is only queued at this point, so remember it locally; the
+      // next load prefers it until the backend row catches up.
+      cacheProfile(saved);
 
       // Keep the session in step so the app bar and home page reflect the
       // change without a reload.
