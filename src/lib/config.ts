@@ -4,22 +4,45 @@
 
 /* ------------------------------------------------------------------ *
  * Backend services
+ *
+ * Read from the environment, falling back to the values below so a fresh
+ * checkout runs without a .env file. Set them in .env.local locally and in the
+ * Amplify environment variables per branch.
+ *
+ * SERVICE_URL, SEND_EMAIL_URL and ORG_CODE are mapped to the browser in
+ * next.config.ts — Next only exposes NEXT_PUBLIC_* automatically, and client
+ * code reads these. JWT_SECRET is deliberately absent from this file: it is a
+ * secret, and anything imported here can end up in the client bundle. It is
+ * read directly inside the OTP route handler instead.
  * ------------------------------------------------------------------ */
+
+/** Trims, strips stray quotes and drops empty values, so `KEY = "value"` in a
+ * .env file resolves the same as `KEY=value`. */
+const fromEnv = (value: string | undefined, fallback: string): string => {
+  const cleaned = (value ?? "").trim().replace(/^["']|["']$/g, "");
+  return cleaned || fallback;
+};
 
 // Generic item service. Routes are {SERVICE_URL}/{ORG_CODE}/<route>, e.g.
 //   GET  {SERVICE_URL}/{ORG_CODE}/itemsbytype/user-panchangam
 //   POST {SERVICE_URL}/{ORG_CODE}/items
-export const SERVICE_URL = "https://z7z4g52p2g.execute-api.ap-south-1.amazonaws.com";
+export const SERVICE_URL = fromEnv(
+  process.env.SERVICE_URL,
+  "https://z7z4g52p2g.execute-api.ap-south-1.amazonaws.com",
+);
 
 // OTP / transactional email service.
-export const SEND_EMAIL_URL = "https://yzcjrbt1x1.execute-api.us-east-1.amazonaws.com/";
+export const SEND_EMAIL_URL = fromEnv(
+  process.env.SEND_EMAIL_URL,
+  "https://yzcjrbt1x1.execute-api.us-east-1.amazonaws.com/",
+);
 
 // Borrowed from the temple app for now: "sbht" is an active organisation, while
 // "panchangam" answers `400 No active organisation found`. Panchangam rows are
 // still isolated because every payload is stamped `type: user-panchangam`, so
 // itemsbytype never mixes them with temple data.
 // TODO(backend): switch to a dedicated "panchangam" org once it is provisioned.
-export const ORG_CODE = "sbht";
+export const ORG_CODE = fromEnv(process.env.ORG_CODE, "sbht");
 
 // Guards profile calls so the UI can explain itself rather than surfacing raw
 // backend errors. Set false if the org above stops resolving.
