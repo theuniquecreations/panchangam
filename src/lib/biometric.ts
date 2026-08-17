@@ -23,6 +23,11 @@ const isClient = () => typeof window !== "undefined";
 type BiometricRecord = {
   email: string;
   credentialId: string; // base64url
+  /** The session token earned by the OTP login that enabled this. Biometrics
+   * unlock that existing token rather than minting a new one — there is no
+   * server-side assertion check, so a fresh token here would be an auth
+   * bypass. Held in encrypted storage, never plain localStorage. */
+  token?: string;
   enabledAt: string;
 };
 
@@ -70,9 +75,12 @@ export function getBiometricRecord(): BiometricRecord | null {
 /** Whether this device already has biometric sign-in bound to an email. */
 export const isBiometricEnabled = (): boolean => getBiometricRecord() !== null;
 
-/** Binds a platform credential to an already-verified email. Call this only
- * after the user has completed an OTP login. */
-export async function enableBiometric(email: string): Promise<void> {
+/** Binds a platform credential to an already-verified email, storing the token
+ * that login produced. Call this only after a completed OTP login. */
+export async function enableBiometric(
+  email: string,
+  token?: string,
+): Promise<void> {
   if (!(await isBiometricAvailable())) {
     throw new Error("This device does not offer FaceID or Touch ID.");
   }
@@ -106,15 +114,20 @@ export async function enableBiometric(email: string): Promise<void> {
   const record: BiometricRecord = {
     email: email.trim().toLowerCase(),
     credentialId: toBase64Url(credential.rawId),
+    token,
     enabledAt: new Date().toISOString(),
   };
 
   secureLocalStorage.setItem(BIOMETRIC_KEY, JSON.stringify(record));
 }
 
-/** Prompts for FaceID / Touch ID and, on success, returns the bound email.
- * Returns null when nothing is bound on this device. */
-export async function signInWithBiometric(): Promise<string | null> {
+/** Prompts for FaceID / Touch ID and, on success, returns the bound email and
+ * the token stored with it. Returns null when nothing is bound on this
+ * device. */
+export async function signInWithBiometric(): Promise<{
+  email: string;
+  token?: string;
+} | null> {
   const record = getBiometricRecord();
   if (!record) return null;
 
@@ -138,7 +151,7 @@ export async function signInWithBiometric(): Promise<string | null> {
   // Either way the caller must not be signed in.
   if (!assertion) return null;
 
-  return record.email;
+  return { email: record.email, token: record.token };
 }
 
 export function disableBiometric(): void {

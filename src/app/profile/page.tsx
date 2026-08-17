@@ -227,7 +227,9 @@ export default function ProfilePage() {
         setBioOn(false);
         setNotice("Face ID sign-in turned off for this device.");
       } else {
-        await enableBiometric(session.email);
+        // Pass the current token so a later biometric unlock restores this
+        // same session rather than one with no authorisation.
+        await enableBiometric(session.email, session.token);
         setBioOn(true);
         setNotice("Face ID sign-in is on for this device.");
       }

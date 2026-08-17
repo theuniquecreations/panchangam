@@ -3,47 +3,32 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, KeyRound, ScanFace, ArrowLeft } from "lucide-react";
-import { sendEmail, getUserByEmail, BackendNotReadyError } from "@/lib/api";
+import {
+  requestOtp,
+  verifyOtp,
+  getUserByEmail,
+  BackendNotReadyError,
+} from "@/lib/api";
 import { setSession, type Session } from "@/lib/session";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
   signInWithBiometric,
 } from "@/lib/biometric";
-import {
-  OTP_LENGTH,
-  OTP_TTL_MS,
-  OTP_RESEND_COOLDOWN_S,
-  BRAND_TITLE,
-} from "@/lib/config";
+import { OTP_LENGTH, OTP_RESEND_COOLDOWN_S } from "@/lib/config";
 
-// Where the pending OTP challenge is held between the two steps.
-const OTP_CHALLENGE_KEY = "panchangam_otp_challenge";
-
-type Challenge = { email: string; code: string; expiresAt: number };
-
-// SECURITY NOTE — the OTP is generated in the browser and checked in the
-// browser, because the only backend available is a generic "send this email"
-// service with no verify endpoint. Anyone who opens devtools can read the code
-// they were sent, so this proves *possession of the inbox* only loosely and
-// must not be treated as strong authentication.
-//
-// The fix is a server-side pair — POST /otp/request and POST /otp/verify —
-// issuing the code and returning a signed token. This module is deliberately
-// shaped around that split (`requestOtp` / `verifyOtp`) so only their bodies
-// need replacing, not the UI.
-function createChallenge(email: string): Challenge {
-  const digits = new Uint32Array(OTP_LENGTH);
-  crypto.getRandomValues(digits);
-  const code = Array.from(digits, (d) => d % 10).join("");
-  return { email, code, expiresAt: Date.now() + OTP_TTL_MS };
-}
-
+// The OTP is generated, emailed and verified entirely server-side by
+// /api/auth/otp. The browser only ever holds an opaque signed challenge (which
+// carries a hash of the code, not the code) and the session token it is
+// exchanged for. That token is what the item service requires — without it
+// every call returns "401 Unauthorized: Missing or invalid token".
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Opaque signed challenge from the server, exchanged on verify.
+  const [otpToken, setOtpToken] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,10 +47,11 @@ export default function LoginPage() {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  /** Signs the user in and lands them back on the panchangam. */
-  const completeLogin = async (verifiedEmail: string) => {
+  /** Signs the user in and lands them back on the panchangam. The token is
+   * what authorises every later item-service call. */
+  const completeLogin = async (verifiedEmail: string, token?: string) => {
     const now = new Date().toISOString();
-    let session: Session = { email: verifiedEmail, loggedInAt: now };
+    let session: Session = { email: verifiedEmail, loggedInAt: now, token };
 
     // Pull the existing profile so the trial clock and name survive re-logins.
     try {
@@ -106,16 +92,7 @@ export default function LoginPage() {
     setNotice("");
 
     try {
-      const challenge = createChallenge(addr);
-      await sendEmail(
-        addr,
-        `Your ${BRAND_TITLE} sign-in code`,
-        `<p>Your ${BRAND_TITLE} sign-in code is:</p>
-         <p style="font-size:26px;font-weight:700;letter-spacing:5px">${challenge.code}</p>
-         <p>It expires in ${Math.round(OTP_TTL_MS / 60000)} minutes. If you did not request it, you can ignore this email.</p>`,
-      );
-
-      sessionStorage.setItem(OTP_CHALLENGE_KEY, JSON.stringify(challenge));
+      setOtpToken(await requestOtp(addr));
       setStep("otp");
       setCooldown(OTP_RESEND_COOLDOWN_S);
       setNotice(`We sent a ${OTP_LENGTH}-digit code to ${addr}.`);
@@ -131,44 +108,35 @@ export default function LoginPage() {
   };
 
   const handleVerifyOtp = async () => {
+    const addr = email.trim().toLowerCase();
     setError("");
-    let challenge: Challenge | null = null;
-    try {
-      const raw = sessionStorage.getItem(OTP_CHALLENGE_KEY);
-      challenge = raw ? (JSON.parse(raw) as Challenge) : null;
-    } catch {
-      challenge = null;
-    }
-
-    if (!challenge) {
-      setError("That code has expired. Request a new one.");
-      setStep("email");
-      return;
-    }
-    if (Date.now() > challenge.expiresAt) {
-      sessionStorage.removeItem(OTP_CHALLENGE_KEY);
-      setError("That code has expired. Request a new one.");
-      setStep("email");
-      return;
-    }
-    if (code.trim() !== challenge.code) {
-      setError("That code is not correct.");
-      return;
-    }
-
     setBusy(true);
-    sessionStorage.removeItem(OTP_CHALLENGE_KEY);
-    await completeLogin(challenge.email);
-    setBusy(false);
+
+    try {
+      const { token } = await verifyOtp(addr, code.trim(), otpToken);
+      await completeLogin(addr, token);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not sign in.";
+      setError(message);
+      // An expired or tampered challenge cannot be retried — send them back to
+      // request a fresh code rather than letting them retype into a dead one.
+      if (message.toLowerCase().includes("expired")) {
+        setStep("email");
+        setCode("");
+        setOtpToken("");
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleBiometric = async () => {
     setError("");
     setBusy(true);
     try {
-      const verifiedEmail = await signInWithBiometric();
-      if (verifiedEmail) {
-        await completeLogin(verifiedEmail);
+      const result = await signInWithBiometric();
+      if (result) {
+        await completeLogin(result.email, result.token);
       } else {
         setError("Biometric sign-in was cancelled.");
       }

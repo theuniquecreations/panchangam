@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useSyncExternalStore } from "react";
-import { MapPin, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   getPanchangam,
   getTimeZoneOffsetHours,
@@ -9,6 +9,11 @@ import {
 } from "@/lib/panchangam";
 import { DEFAULT_LOCATION, REVERSE_GEOCODE_URL } from "@/lib/config";
 import type { Place } from "@/lib/place";
+import Calendar, {
+  toDateValue,
+  fromDateValue,
+  shiftDays,
+} from "@/components/Calendar";
 
 // The wall clock as an external store. Ticking via useSyncExternalStore rather
 // than a setState-in-effect keeps the snapshot a stable primitive (whole
@@ -25,29 +30,6 @@ function useClockSeconds(): number {
     () => 0,
   );
 }
-
-/** Local calendar date as YYYY-MM-DD. Built from local parts rather than
- * toISOString(), which would shift the day for anyone behind UTC. */
-function toDateInput(d: Date): string {
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-/** Parses YYYY-MM-DD as a *local* midnight. `new Date("2026-08-17")` parses as
- * UTC and lands on the previous day in western time zones. */
-function fromDateInput(value: string): Date {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
-const shiftDays = (value: string, delta: number): string => {
-  const d = fromDateInput(value);
-  d.setDate(d.getDate() + delta);
-  return toDateInput(d);
-};
 
 // Computes and renders the panchangam for a place and a chosen day.
 // Self-contained: owns the calendar filter, the live clock and the
@@ -83,7 +65,7 @@ export default function TodayPanchangam({
 
   // "" while server-rendering (clock snapshot is 0), real date once mounted.
   const todayValue = clockSeconds
-    ? toDateInput(new Date(clockSeconds * 1000))
+    ? toDateValue(new Date(clockSeconds * 1000))
     : "";
   const selectedDate = pickedDate ?? todayValue;
   const isToday = !!selectedDate && selectedDate === todayValue;
@@ -96,7 +78,7 @@ export default function TodayPanchangam({
     try {
       // Anchor to local noon: the engine works from local midnight, and noon
       // keeps the intended calendar day on either side of a DST shift.
-      const date = fromDateInput(selectedDate);
+      const date = fromDateValue(selectedDate);
       date.setHours(12, 0, 0, 0);
       const tz = active.timeZone
         ? getTimeZoneOffsetHours(date, active.timeZone)
@@ -210,31 +192,11 @@ export default function TodayPanchangam({
           <ChevronLeft size={18} />
         </button>
 
-        {/* Tapping anywhere on the field opens the native calendar. Typing is
-            blocked so the only way to change the date is through the picker. */}
-        <label
-          className="date-bar-field"
-          onClick={(e) => {
-            const input = e.currentTarget.querySelector("input");
-            // showPicker throws if the browser blocks it outside a user
-            // gesture; the click handler is one, but guard anyway.
-            try {
-              input?.showPicker?.();
-            } catch {
-              /* fall back to the browser's own indicator */
-            }
-          }}
-        >
-          <CalendarDays size={16} className="date-bar-icon" />
-          <input
-            type="date"
-            className="date-bar-input"
-            value={selectedDate}
-            onChange={(e) => setPickedDate(e.target.value)}
-            onKeyDown={(e) => e.preventDefault()}
-            aria-label="Show panchangam for date"
-          />
-        </label>
+        <Calendar
+          value={selectedDate}
+          today={todayValue}
+          onChange={setPickedDate}
+        />
 
         <button
           type="button"

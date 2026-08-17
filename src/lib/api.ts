@@ -109,8 +109,33 @@ export async function getUsers(): Promise<UserProfile[]> {
   return Array.isArray(rows) ? rows : [];
 }
 
-/** Look up a single profile by email. Falls back to scanning the type list when
- * the backend has no filter route, so this works either way. */
+/** Filters rows on two columns — the backend's filter2column route.
+ * POST, not a path-based GET, matching the temple app. */
+export async function filterItems(
+  column1: string,
+  value1: string,
+  column2: string,
+  value2: string,
+): Promise<UserProfile[]> {
+  if (!value1 || !value2) return [];
+  const rows = await withRetry(() =>
+    request("/items/filter2column", {
+      method: "POST",
+      body: JSON.stringify({
+        column1,
+        value1,
+        column2,
+        value2,
+        orgCode: ORG_CODE,
+      }),
+    }),
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** Look up a single profile by email, filtering on type + email so only this
+ * app's rows are considered. Falls back to scanning the type listing if the
+ * filter route is unavailable. */
 export async function getUserByEmail(
   email: string,
 ): Promise<UserProfile | null> {
@@ -118,11 +143,12 @@ export async function getUserByEmail(
   const needle = email.trim().toLowerCase();
 
   try {
-    const rows = await request(
-      `/filter/type/${ITEM_TYPE_USER}/email/${encodeURIComponent(needle)}`,
-    );
-    if (Array.isArray(rows) && rows.length) return pickProfile(rows);
-  } catch {
+    const rows = await filterItems("type", ITEM_TYPE_USER, "email", needle);
+    if (rows.length) return pickProfile(rows);
+    // An empty result is authoritative: this is a new user, not a failure.
+    return null;
+  } catch (err) {
+    if (err instanceof Error && /401|403/.test(err.message)) throw err;
     // Filter route unavailable — fall through to the type listing.
   }
 
@@ -159,7 +185,40 @@ export async function saveUser(profile: Partial<UserProfile>): Promise<UserProfi
   return payload;
 }
 
-/** Sends the OTP email through our own route handler.
+/* ------------------------------------------------------------------ *
+ * Auth — the OTP is issued and verified server-side, which is also what
+ * produces the bearer token the item service requires.
+ * ------------------------------------------------------------------ */
+
+async function postAuth(payload: Record<string, unknown>) {
+  const res = await fetch("/api/auth/otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `${res.status} ${res.statusText}`);
+  return data;
+}
+
+/** Emails a code and returns the signed challenge to hand back on verify. */
+export async function requestOtp(email: string): Promise<string> {
+  const data = await postAuth({ action: "send", email });
+  return data.otpToken as string;
+}
+
+/** Exchanges a correct code for the session token. */
+export async function verifyOtp(
+  email: string,
+  otp: string,
+  otpToken: string,
+): Promise<{ token: string }> {
+  const data = await postAuth({ action: "verify", email, otp, otpToken });
+  return { token: data.token as string };
+}
+
+/** Sends a general email through our own route handler.
  *
  * It cannot go direct: the email service returns no Access-Control-Allow-Origin
  * header, so the browser blocks the call before it leaves the page ("Failed to
