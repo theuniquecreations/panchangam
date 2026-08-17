@@ -87,12 +87,38 @@ body {
   min-width: 0;
 }
 
+.app-bar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .app-bar-title {
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   margin: 0;
   color: var(--gold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Environment marker. Deliberately high-contrast against the maroon bar so it
+   reads as a warning strip rather than decoration — it exists to stop someone
+   mistaking a dev or QA build for production. */
+.env-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--gold);
+  color: var(--maroon-deep);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1.6;
 }
 
 .app-bar-tagline {

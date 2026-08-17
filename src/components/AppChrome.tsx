@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Sun, User, LogIn, LogOut, ShieldCheck } from "lucide-react";
-import { BRAND_TITLE, BRAND_TAGLINE, isAdminEmail } from "@/lib/config";
+import {
+  BRAND_TITLE,
+  BRAND_TAGLINE,
+  isAdminEmail,
+  APP_ENV,
+  SHOW_ENV_BADGE,
+} from "@/lib/config";
 import { useSession, useSessionReady, clearSession } from "@/lib/session";
 import { clearCachedProfile } from "@/lib/profile-cache";
 
@@ -26,7 +32,16 @@ export function AppBar() {
   return (
     <header className="app-bar">
       <div className="app-bar-brand">
-        <h1 className="app-bar-title">{BRAND_TITLE}</h1>
+        <div className="app-bar-title-row">
+          <h1 className="app-bar-title">{BRAND_TITLE}</h1>
+          {/* Non-production marker, so it is obvious at a glance which
+              environment a build is talking to. Hidden on production. */}
+          {SHOW_ENV_BADGE && (
+            <span className="env-badge" title={`Running against ${APP_ENV}`}>
+              {APP_ENV}
+            </span>
+          )}
+        </div>
         <span className="app-bar-tagline">{BRAND_TAGLINE}</span>
       </div>
       {ready &&

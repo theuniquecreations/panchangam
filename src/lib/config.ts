@@ -39,6 +39,22 @@ export const SEND_EMAIL_URL = fromEnv(process.env.SEND_EMAIL_URL);
 // `type: user-panchangam`, so itemsbytype never mixes them with other data.
 export const ORG_CODE = fromEnv(process.env.ORG_CODE);
 
+/* ------------------------------------------------------------------ *
+ * Environment label
+ * ------------------------------------------------------------------ */
+
+// Which environment this build is running as — "Dev", "QA", "Prod".
+// NEXT_PUBLIC_-prefixed, so Next exposes it to the browser automatically and it
+// needs no entry in next.config.ts.
+export const APP_ENV = fromEnv(process.env.NEXT_PUBLIC_ENV);
+
+/** Whether to show the environment badge. Production is deliberately unbadged —
+ * the point of the marker is to warn you that you are *not* on production, so
+ * showing it there would only add noise for real users. An unset value shows
+ * nothing either, so a misconfigured build never mislabels itself. */
+export const SHOW_ENV_BADGE =
+  !!APP_ENV && !["prod", "production", "live"].includes(APP_ENV.toLowerCase());
+
 /** Throws a named, actionable error when a required variable is missing, so a
  * misconfigured environment reports itself instead of producing requests to
  * URLs like "/sbht/items" or "undefined/sendemail". */
